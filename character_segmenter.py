@@ -20,7 +20,7 @@ def get_letter_images(raw_image: np.ndarray, **kwargs) -> Iterable[Image.Image]:
     def cropped_letter_img(box):
         return img.crop(box=(box[3][0] + 1, box[3][1] + 1, box[1][0], box[1][1]))
 
-    return map(sample_image.pad_and_resize, map(cropped_letter_img, boxes))
+    return map(cropped_letter_img, boxes)
 
 
 def get_letter_bounding_boxes(
