@@ -26,7 +26,10 @@ COLOR_ERROR = getrgb('red')
 
 def combine_segmented_letter_images(filename: str, expected_length: int = None) -> Image.Image:
     letter_imgs = list(get_letter_images(
-        sample_image.read_grayscale(filename), contour_threshold=80))
+        sample_image.read_grayscale(filename),
+        expected_min_boxes=expected_length,
+        expected_max_boxes=expected_length,
+        contour_threshold=80))
     widths, heights = zip(*(i.size for i in letter_imgs))
 
     if expected_length == None:

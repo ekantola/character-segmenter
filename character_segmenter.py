@@ -6,33 +6,53 @@ import sys
 from PIL import Image
 from functools import reduce
 from operator import itemgetter
-from typing import Iterable
+from typing import Iterable, List
 
 
-def get_letter_images(raw_image: np.ndarray, expected_max_length: int = 7, **kwargs) -> Iterable[Image.Image]:
-    boxes = get_letter_bounding_boxes(raw_image, expected_max_length, **kwargs)
+class SegmenterException(Exception):
+    pass
+
+
+def get_letter_images(raw_image: np.ndarray, **kwargs) -> Iterable[Image.Image]:
+    boxes = get_letter_bounding_boxes(raw_image, **kwargs)
     img = Image.fromarray(raw_image)
 
-    def crop_letter(box):
+    def cropped_letter_img(box):
         return img.crop(box=(box[3][0] + 1, box[3][1] + 1, box[1][0], box[1][1]))
 
-    return map(sample_image.pad_and_resize, map(crop_letter, boxes))
+    return map(sample_image.pad_and_resize, map(cropped_letter_img, boxes))
 
 
-def get_letter_bounding_boxes(image: np.ndarray, expected_max_length: int, contour_threshold: int = 80):
+def get_letter_bounding_boxes(
+        image: np.ndarray,
+        expected_min_boxes: int = None,
+        expected_max_boxes: int = None,
+        contour_threshold: int = 80):
     '''
     Looks like the contour threshold of around 80 performs best for my test data, so choosing that one as a default. The case might be very different for some other kind of images.
     '''
     _, thresh = cv2.threshold(image, contour_threshold, 255, cv2.THRESH_BINARY)
-    [contours, _] = cv2.findContours(
+    contours, _ = cv2.findContours(
         thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    merged = merge_vertical_overlaps(
+
+    letter_boxes = merge_vertical_overlaps(
         bounding_boxes(flatten_innermost(contours[1:])))
 
-    while len(merged) > expected_max_length:
-        merged = merge_two_thinnest_adjacent_boxes(merged)
+    if expected_max_boxes:
+        while len(letter_boxes) > expected_max_boxes:
+            letter_boxes = merge_two_boxes_with_smallest_areas(letter_boxes)
 
-    return merged
+    if expected_min_boxes and len(letter_boxes) < expected_min_boxes:
+        # Try once more harder with a lower threshold
+        letter_boxes = get_letter_bounding_boxes(
+            image, expected_min_boxes, expected_max_boxes, contour_threshold / 2)
+        # If that still fails, then no can do
+        if len(letter_boxes) < expected_min_boxes:
+            raise SegmenterException(
+                'Could not split letters enough to meet expected minimum ' +
+                'of {expected_min_boxes} (now got: {len(letter_boxes)})')
+
+    return letter_boxes
 
 
 def flatten_innermost(contours: Iterable) -> Iterable[list]:
@@ -49,7 +69,7 @@ def bounding_box(contour: list):
 
 
 def bounding_boxes(contours: Iterable[list]) -> Iterable[list]:
-    return sorted(map(bounding_box, contours), key=by_x_min)
+    return sorted(filter(box_area, map(bounding_box, contours)), key=by_x_min)
 
 
 def by_x_min(box: list) -> int:
@@ -76,15 +96,23 @@ def has_vertical_overlap(bounding_box1: list, bounding_box2: list) -> bool:
     return max(x_min1, x_min2) < min(x_max1, x_max2)
 
 
-def merge_two_thinnest_adjacent_boxes(boxes: list) -> list:
-    widths = list(map(box_width, boxes))
-    adjacent_sums = [x + y for x, y in zip(widths, widths[1:] + [0])][:-1]
+def merge_two_boxes_with_smallest_areas(boxes: List[list]) -> List[list]:
+    areas = list(map(box_area, boxes))
+    adjacent_sums = [x + y for x, y in zip(areas, areas[1:] + [0])][:-1]
     first_index = min(enumerate(adjacent_sums), key=itemgetter(1))[0]
     return boxes[:first_index] + [bounding_box(boxes[first_index] + boxes[first_index+1])] + boxes[first_index+2:]
 
 
-def box_width(box):
-    return box[1][0] - box[0][0]
+def box_area(box: List[list]) -> int:
+    return box_width(box) * box_height(box)
+
+
+def box_width(box: List[list]) -> int:
+    return abs(box[1][0] - box[0][0])
+
+
+def box_height(box: List[list]) -> int:
+    return abs(box[1][1] - box[2][1])
 
 
 def first_elem(x: Iterable):
