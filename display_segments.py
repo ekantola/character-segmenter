@@ -10,7 +10,7 @@ import sample_image
 import re
 import sys
 
-from character_segmenter import get_letter_images
+from segmenter import get_letter_images
 from glob import iglob
 from itertools import chain
 from PIL import Image

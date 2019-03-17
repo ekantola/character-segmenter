@@ -1,7 +1,7 @@
 import sample_image
 import unittest
 
-from character_segmenter import get_letter_images
+from segmenter import get_letter_images
 
 
 class CharacterSegmenterTest(unittest.TestCase):
