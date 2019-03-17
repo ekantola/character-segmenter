@@ -43,14 +43,14 @@ def get_letter_bounding_boxes(
             letter_boxes = merge_two_boxes_with_smallest_areas(letter_boxes)
 
     if expected_min_boxes and len(letter_boxes) < expected_min_boxes:
-        # Try once more harder with a lower threshold
+        # Try once more harder with a lower threshold, but prevent getting here again
         letter_boxes = get_letter_bounding_boxes(
-            image, expected_min_boxes, expected_max_boxes, contour_threshold / 2)
+            image, None, expected_max_boxes, contour_threshold / 2)
         # If that still fails, then no can do
         if len(letter_boxes) < expected_min_boxes:
             raise SegmenterException(
                 'Could not split letters enough to meet expected minimum ' +
-                'of {expected_min_boxes} (now got: {len(letter_boxes)})')
+                f'of {expected_min_boxes} (now got: {len(letter_boxes)})')
 
     return letter_boxes
 
