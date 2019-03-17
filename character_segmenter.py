@@ -121,3 +121,69 @@ def first_elem(x: Iterable):
 
 def second_elem(x: Iterable):
     return x[1]
+
+
+if __name__ == '__main__':
+    import os
+    import re
+    import sys
+    import traceback
+    from glob import iglob
+    from itertools import chain
+
+    if len(sys.argv) < 2:
+        print('Usage: {sys.argv[0]} outdir image-filename-pattern...')
+        exit(1)
+
+    _, outdir, *file_patterns = sys.argv
+
+    filenames = chain.from_iterable(map(iglob, file_patterns))
+    filename_re = re.compile('^.*_([a-z]+)\\.[^.]+$')
+
+    print('Segmenting images: ', end='', flush=True)
+    input_count = 0
+    success_count = 0
+    success_letter_count = 0
+    error_count = 0
+    for filename in filenames:
+        input_count += 1
+        try:
+            match = filename_re.match(filename)
+            if match:
+                solved_text = match[1]
+                expected_length = len(solved_text)
+            else:
+                solved_text = None
+                expected_length = None
+
+            letter_imgs = list(map(sample_image.pad_and_resize, get_letter_images(
+                sample_image.read_grayscale(filename),
+                expected_min_boxes=expected_length,
+                expected_max_boxes=expected_length,
+                contour_threshold=80)))
+
+            basename, _ = os.path.basename(filename).split(".")
+
+            if not solved_text:
+                solved_text = '_' * len(letter_imgs)
+
+            for i, letter_img in enumerate(letter_imgs):
+                letter = solved_text[i]
+                letter_outdir = f'{outdir}/{letter}'
+                os.makedirs(letter_outdir, exist_ok=True)
+                letter_img.save(f'{letter_outdir}/{basename}_{i}.bmp')
+                success_letter_count += 1
+
+            success_count += 1
+
+        except Exception as e:
+            print(f'\nCould not process {filename}: {traceback.format_exc()}')
+            error_count += 1
+
+        if input_count % 1000 == 0:
+            print(str(input_count) + '...', end='', flush=True)
+
+    print('done.')
+    print(
+        f'Total {input_count} input files, {success_count} processed successfully ' +
+        f'({success_letter_count} total letters segmented), with {error_count} errors')
