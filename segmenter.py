@@ -130,6 +130,7 @@ if __name__ == '__main__':
     import traceback
     from glob import iglob
     from itertools import chain
+    from time import time
 
     if len(sys.argv) < 2:
         print('Usage: {sys.argv[0]} outdir image-filename-pattern...')
@@ -141,6 +142,7 @@ if __name__ == '__main__':
     filename_re = re.compile('^.*_([a-z]+)\\.[^.]+$')
 
     print('Segmenting images: ', end='', flush=True)
+    start_time = time()
     input_count = 0
     success_count = 0
     success_letter_count = 0
@@ -183,7 +185,7 @@ if __name__ == '__main__':
         if input_count % 1000 == 0:
             print(str(input_count) + '...', end='', flush=True)
 
-    print('done.')
+    print(f'done in {time() - start_time} seconds.')
     print(
         f'Total {input_count} input files, {success_count} processed successfully ' +
         f'({success_letter_count} total letters segmented), with {error_count} errors')
